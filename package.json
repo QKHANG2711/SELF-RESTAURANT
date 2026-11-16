@@ -1,0 +1,11 @@
+{
+  "name": "self-restaurant-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "test:server": "cd server && npm test",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && npm run build"
+  }
+}

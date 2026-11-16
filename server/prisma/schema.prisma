@@ -1,0 +1,365 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String            @id @default(uuid())
+  email           String            @unique
+  passwordHash    String
+  fullName        String
+  phone           String?
+  role            String            @default("CUSTOMER") // CUSTOMER, WAITER, CHEF, CASHIER, MANAGER
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  customerOrders  Order[]           @relation("CustomerOrders")
+  waiterOrders    Order[]           @relation("WaiterOrders")
+  payments        Payment[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Category {
+  id              String            @id @default(uuid())
+  name            String
+  slug            String            @unique
+  description     String?
+  displayOrder    Int               @default(0)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  menuItems       MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id                     String      @id @default(uuid())
+  categoryId             String
+  category               Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name                   String
+  description            String?
+  price                  Float
+  imageUrl               String?
+  isAvailable            Boolean     @default(true)
+  isFeatured             Boolean     @default(false)
+  preparationTimeMinutes Int         @default(15)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  orderItems             OrderItem[]
+  recipe                 Recipe?
+
+  @@map("menu_items")
+}
+
+model RestaurantArea {
+  id          String            @id @default(uuid())
+  name        String
+  floor       Int               @default(1)
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tables      RestaurantTable[]
+
+  @@map("restaurant_areas")
+}
+
+model RestaurantTable {
+  id          String            @id @default(uuid())
+  tableCode   String            @unique
+  areaId      String
+  area        RestaurantArea    @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  capacity    Int               @default(4)
+  status      String            @default("AVAILABLE") // AVAILABLE, OCCUPIED, SERVING, PAYMENT_REQUESTED, RESERVED
+  qrCodeToken String            @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  orders      Order[]
+
+  @@map("restaurant_tables")
+}
+
+model Order {
+  id                 String          @id @default(uuid())
+  orderNumber        String          @unique
+  tableId            String
+  table              RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  customerId         String?
+  customer           User?           @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: SetNull)
+  waiterId           String?
+  waiter             User?           @relation("WaiterOrders", fields: [waiterId], references: [id], onDelete: SetNull)
+  status             String          @default("RECEIVED") // RECEIVED, COOKING, READY, SERVED, PAYMENT_REQUESTED, COMPLETED, CANCELLED
+  totalAmount        Float           @default(0)
+  promotionCode      String?
+  discountAmount     Float           @default(0)
+  notes              String?
+  paymentRequestedAt DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  items              OrderItem[]
+  payments           Payment[]
+  invoices           Invoice[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String       @id @default(uuid())
+  orderId           String
+  order             Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId        String
+  menuItem          MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  quantity          Int          @default(1)
+  unitPrice         Float
+  subtotal          Float
+  notes             String?
+  status            String       @default("RECEIVED") // RECEIVED, COOKING, READY, SERVED, CANCELLED
+  startedCookingAt  DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                   String     @id @default(uuid())
+  orderId              String
+  order                Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  invoiceId            String?
+  amount               Float
+  paymentMethod        String     @default("CASH") // CASH, BANK_TRANSFER, CARD, SIMULATED_QR
+  customerGivenAmount  Float?
+  changeReturned       Float?
+  status               String     @default("SUCCESS") // PENDING, SUCCESS, FAILED
+  transactionReference String?
+  cashierId            String?
+  cashier              User?      @relation(fields: [cashierId], references: [id], onDelete: SetNull)
+  paidAt               DateTime   @default(now())
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("payments")
+}
+
+model Invoice {
+  id             String    @id @default(uuid())
+  invoiceNumber  String    @unique
+  orderId        String
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  totalAmount    Float
+  discountAmount Float     @default(0)
+  finalAmount    Float
+  paymentMethod  String
+  cashierId      String?
+  customerName   String?
+  tableCode      String
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  @@map("invoices")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userEmail  String?
+  userRole   String?
+  action     String
+  entity     String
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+
+  @@map("audit_logs")
+}
+
+model RestaurantConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("restaurant_configs")
+}
+
+// === SUPPLIER (Nhà cung cấp) ===
+model Supplier {
+  id          String   @id @default(uuid())
+  supplierCode String  @unique
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stockReceipts StockReceipt[]
+  ingredientSuppliers IngredientSupplier[]
+
+  @@map("suppliers")
+}
+
+// === INGREDIENT (Nguyên liệu) ===
+model Ingredient {
+  id              String   @id @default(uuid())
+  ingredientCode  String   @unique
+  name            String
+  unit            String   // kg, g, lít, ml, chai, hộp, cái, phần
+  category        String?  // Thịt, Rau, Gia vị, Đồ uống, etc.
+  currentStock    Float    @default(0)
+  reservedStock   Float    @default(0) // đang giữ chỗ cho đơn
+  minimumStock    Float    @default(0)
+  lastCostPrice   Float?   // Giá nhập gần nhất
+  isActive        Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  stockReceipts   StockReceiptItem[]
+  transactions    StockTransaction[]
+  recipes         RecipeIngredient[]
+  suppliers       IngredientSupplier[]
+
+  @@map("ingredients")
+}
+
+// === INGREDIENT SUPPLIER (Quan hệ nguyên liệu - nhà cung cấp) ===
+model IngredientSupplier {
+  id           String     @id @default(uuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  supplierId   String
+  supplier     Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  isPreferred  Boolean    @default(false)
+
+  @@unique([ingredientId, supplierId])
+  @@map("ingredient_suppliers")
+}
+
+// === STOCK RECEIPT (Phiếu nhập kho) ===
+model StockReceipt {
+  id              String   @id @default(uuid())
+  receiptNumber   String   @unique
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  receivedById    String?
+  totalAmount     Float    @default(0)
+  status          String   @default("DRAFT") // DRAFT, CONFIRMED
+  notes           String?
+  supplierInvoice String?
+  receivedAt      DateTime @default(now())
+  confirmedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           StockReceiptItem[]
+
+  @@map("stock_receipts")
+}
+
+// === STOCK RECEIPT ITEM (Chi tiết phiếu nhập) ===
+model StockReceiptItem {
+  id           String      @id @default(uuid())
+  receiptId    String
+  receipt      StockReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  quantity     Float
+  unit         String
+  costPrice    Float
+  subtotal     Float
+  notes        String?
+
+  @@map("stock_receipt_items")
+}
+
+// === STOCK TRANSACTION (Lịch sử giao dịch kho) ===
+model StockTransaction {
+  id              String     @id @default(uuid())
+  ingredientId    String
+  ingredient      Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  type            String     // IMPORT (nhập), CONSUME (tiêu hao), RESERVE (giữ chỗ), RELEASE (giải phóng), ADJUST (điều chỉnh)
+  quantity        Float      // dương = tăng, âm = giảm
+  unit            String
+  beforeStock     Float
+  afterStock      Float
+  orderId         String?
+  receiptId       String?
+  performedBy     String?
+  notes           String?
+  createdAt       DateTime   @default(now())
+
+  @@map("stock_transactions")
+}
+
+// === RECIPE (Công thức món ăn) ===
+model Recipe {
+  id          String   @id @default(uuid())
+  menuItemId  String   @unique
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients RecipeIngredient[]
+
+  @@map("recipes")
+}
+
+// === RECIPE INGREDIENT (Nguyên liệu trong công thức) ===
+model RecipeIngredient {
+  id           String     @id @default(uuid())
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  quantity     Float
+  unit         String
+
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_ingredients")
+}
+
+// === PROMOTION (Khuyến mãi) ===
+model Promotion {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  name            String
+  description     String?
+  type            String   // PERCENT, FIXED_AMOUNT
+  value           Float    // % hoặc số tiền
+  minimumOrder    Float    @default(0)
+  maximumDiscount Float?   // Giảm tối đa (cho type PERCENT)
+  startDate       DateTime
+  endDate         DateTime
+  usageLimit      Int?     // Số lần sử dụng tối đa
+  usedCount       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("promotions")
+}

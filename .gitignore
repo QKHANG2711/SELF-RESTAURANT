@@ -1,0 +1,49 @@
+﻿# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+build/
+**/build/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# Tests and coverage
+coverage/
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+
+# Temporary files
+tmp/
+temp/
+
+*.db-*
+*.sqlite-*
